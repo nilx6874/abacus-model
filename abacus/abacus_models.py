@@ -67,20 +67,11 @@ class Abacus:
         if self.current_value() + number > self.max_value:
             raise ValueError("Adding error: Number too large to be represented")
 
-        carry = 0
-
-        for i in range(len(self.rods)):
-            digit = (number % 10) + carry
+        digits = []
+        while number:
+            digits.append(number % 10)
             number //= 10
-
-            # Update current rod and calculate carry
-            new_value = self.rods[i].value() + digit
-            carry = new_value // 10
-            self.rods[i].set_value(new_value % 10)
-
-            # If there's no more number and no carry, break the loop
-            if number == 0 and carry == 0:
-                break
+        self._add_digits_at_offset(digits or [0], offset=0)
 
     def subtract(self, number):
         self._validate_operand(number)
@@ -108,6 +99,94 @@ class Abacus:
             # Break if no more number to subtract and no borrow
             if number == 0 and borrow == 0:
                 break
+
+    def _copy_value_from(self, other):
+        for rod, other_rod in zip(self.rods, other.rods):
+            rod.set_value(other_rod.value())
+
+    def _add_digits_at_offset(self, digits, offset):
+        """Add little-endian decimal digits starting at the given rod."""
+        carry = 0
+        for source_index, digit in enumerate(digits):
+            target_index = source_index + offset
+            if target_index >= len(self.rods):
+                if digit or carry:
+                    raise ValueError("Number too large to be represented")
+                continue
+
+            new_value = self.rods[target_index].value() + digit + carry
+            carry = new_value // 10
+            self.rods[target_index].set_value(new_value % 10)
+
+        target_index = len(digits) + offset
+        while carry:
+            if target_index >= len(self.rods):
+                raise ValueError("Number too large to be represented")
+
+            new_value = self.rods[target_index].value() + carry
+            carry = new_value // 10
+            self.rods[target_index].set_value(new_value % 10)
+            target_index += 1
+
+    def _shift_left_and_add_digit(self, digit):
+        """Shift the register one decimal place and append one digit."""
+        if self.rods[-1].value() != 0:
+            raise ValueError("Number too large to be represented")
+
+        for index in range(len(self.rods) - 1, 0, -1):
+            self.rods[index].set_value(self.rods[index - 1].value())
+        self.rods[0].set_value(digit)
+
+    def multiply(self, number):
+        """Multiply using decimal partial products and rod-level addition."""
+        self._validate_operand(number)
+        multiplicand_digits = [rod.value() for rod in self.rods]
+        while len(multiplicand_digits) > 1 and multiplicand_digits[-1] == 0:
+            multiplicand_digits.pop()
+
+        result = Abacus(len(self.rods))
+        offset = 0
+        multiplier = number
+        try:
+            while multiplier:
+                multiplier_digit = multiplier % 10
+                multiplier //= 10
+
+                # A decimal partial product is repeated addition of the
+                # multiplicand, shifted to the current multiplier digit.
+                for _ in range(multiplier_digit):
+                    result._add_digits_at_offset(multiplicand_digits, offset)
+                offset += 1
+        except ValueError as error:
+            raise ValueError(
+                "Multiplication error: Result is too large to be represented"
+            ) from error
+
+        self._copy_value_from(result)
+
+    def divide(self, number):
+        """Divide using decimal long division and repeated subtraction."""
+        self._validate_operand(number)
+        if number == 0:
+            raise ZeroDivisionError("Division error: Cannot divide by zero")
+
+        quotient = Abacus(len(self.rods))
+        remainder = Abacus(len(self.rods))
+
+        for rod in reversed(self.rods):
+            remainder._shift_left_and_add_digit(rod.value())
+
+            quotient_digit = 0
+            while remainder.current_value() >= number:
+                remainder.subtract(number)
+                quotient_digit += 1
+
+            quotient._shift_left_and_add_digit(quotient_digit)
+
+        if remainder.current_value() != 0:
+            raise ValueError("Division error: Result is not an integer")
+
+        self._copy_value_from(quotient)
 
     @staticmethod
     def _render_row(rod_displays, row, bead, empty, separator):

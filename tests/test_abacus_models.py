@@ -74,8 +74,77 @@ class AbacusTests(unittest.TestCase):
 
         self.assertEqual(5, abacus.current_value())
 
+    def test_multiply_for_all_representable_two_rod_results(self):
+        for start in range(100):
+            for operand in range(100):
+                result = start * operand
+                if result > 99:
+                    continue
+
+                with self.subTest(start=start, operand=operand):
+                    abacus = Abacus(2)
+                    abacus.add(start)
+                    abacus.multiply(operand)
+                    self.assertEqual(result, abacus.current_value())
+
+    def test_multiply_rejects_overflow_without_changing_value(self):
+        abacus = Abacus(2)
+        abacus.add(50)
+
+        with self.assertRaises(ValueError):
+            abacus.multiply(2)
+
+        self.assertEqual(50, abacus.current_value())
+
+    def test_multiply_with_multiple_partial_products(self):
+        abacus = Abacus(6)
+        abacus.add(123)
+
+        abacus.multiply(45)
+
+        self.assertEqual(5535, abacus.current_value())
+
+    def test_divide_for_all_exact_two_rod_results(self):
+        for start in range(100):
+            for divisor in range(1, 100):
+                quotient, remainder = divmod(start, divisor)
+                if remainder:
+                    continue
+
+                with self.subTest(start=start, divisor=divisor):
+                    abacus = Abacus(2)
+                    abacus.add(start)
+                    abacus.divide(divisor)
+                    self.assertEqual(quotient, abacus.current_value())
+
+    def test_divide_rejects_zero_without_changing_value(self):
+        abacus = Abacus(2)
+        abacus.add(12)
+
+        with self.assertRaises(ZeroDivisionError):
+            abacus.divide(0)
+
+        self.assertEqual(12, abacus.current_value())
+
+    def test_divide_rejects_remainder_without_changing_value(self):
+        abacus = Abacus(2)
+        abacus.add(10)
+
+        with self.assertRaises(ValueError):
+            abacus.divide(3)
+
+        self.assertEqual(10, abacus.current_value())
+
+    def test_divide_with_multiple_quotient_digits(self):
+        abacus = Abacus(4)
+        abacus.add(9876)
+
+        abacus.divide(12)
+
+        self.assertEqual(823, abacus.current_value())
+
     def test_operations_reject_negative_operands(self):
-        for method_name in ("add", "subtract"):
+        for method_name in ("add", "subtract", "multiply", "divide"):
             with self.subTest(method=method_name):
                 abacus = Abacus(2)
                 with self.assertRaises(ValueError):
@@ -83,7 +152,7 @@ class AbacusTests(unittest.TestCase):
                 self.assertEqual(0, abacus.current_value())
 
     def test_operations_reject_non_integer_operands(self):
-        for method_name in ("add", "subtract"):
+        for method_name in ("add", "subtract", "multiply", "divide"):
             for operand in (1.5, "1", True):
                 with self.subTest(method=method_name, operand=operand):
                     with self.assertRaises(TypeError):

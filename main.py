@@ -16,13 +16,19 @@ def main():
     show_abacus(abacus, "Initial state")
 
     abacus.add(300)
-    show_abacus(abacus, "After adding 3")
+    show_abacus(abacus, "After adding 300")
 
     abacus.add(99)
-    show_abacus(abacus, "After adding 12")
+    show_abacus(abacus, "After adding 99")
 
     abacus.subtract(6)
     show_abacus(abacus, "After subtracting 6")
+
+    abacus.multiply(2)
+    show_abacus(abacus, "After multiplying by 2")
+
+    abacus.divide(3)
+    show_abacus(abacus, "After dividing by 3")
 
 
 if __name__ == "__main__":
